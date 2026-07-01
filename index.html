@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>获取经纬度</title>
+    <title>获取坐标（含坐标系转换）</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
@@ -16,16 +16,15 @@
             align-items: center;
         }
         .card {
-            max-width: 480px;
+            max-width: 520px;
             width: 100%;
             background: #fff;
             border-radius: 24px;
             box-shadow: 0 12px 48px rgba(0,0,0,0.08);
             padding: 32px 24px;
-            text-align: center;
         }
-        h2 { font-size: 24px; font-weight: 700; color: #1e293b; margin-bottom: 8px; }
-        .subhead { font-size: 14px; color: #64748b; margin-bottom: 20px; }
+        h2 { font-size: 24px; font-weight: 700; color: #1e293b; margin-bottom: 4px; }
+        .subhead { font-size: 14px; color: #64748b; margin-bottom: 16px; }
         .btn {
             width: 100%;
             padding: 14px;
@@ -43,6 +42,7 @@
         .btn:disabled { opacity: 0.6; }
         .btn-success { background: #22c55e; }
         .btn-secondary { background: #8b5cf6; }
+        .btn-sm { padding: 8px 12px; font-size: 14px; width: auto; margin: 4px 4px 4px 0; }
         .info-box {
             background: #f8fafc;
             border-radius: 16px;
@@ -60,11 +60,20 @@
         }
         .info-box label:first-child { margin-top: 0; }
         .info-box .value {
-            font-size: 20px;
+            font-size: 18px;
             font-weight: 700;
             color: #1e293b;
             word-break: break-all;
         }
+        .coord-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 4px 0;
+            border-bottom: 1px solid #eef2f6;
+        }
+        .coord-row .label { font-weight: 600; color: #475569; min-width: 60px; }
+        .coord-row .coord { font-family: monospace; font-size: 16px; color: #0f172a; }
         .status-msg {
             padding: 12px 16px;
             border-radius: 12px;
@@ -85,10 +94,11 @@
             border-radius: 12px;
             line-height: 1.6;
         }
-        .flex-row { display: flex; gap: 8px; align-items: center; }
-        .flex-1 { flex: 1; }
+        .flex-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
         .mt-8 { margin-top: 8px; }
         .text-center { text-align: center; }
+        .switch-label { font-size: 14px; color: #1e293b; font-weight: 500; margin-right: 8px; }
+        select { padding: 6px 12px; border-radius: 8px; border: 1px solid #cbd5e1; font-size: 14px; background: #fff; }
         .badge {
             display: inline-block;
             padding: 2px 10px;
@@ -102,150 +112,285 @@
 </head>
 <body>
 <div class="card">
-    <h2>📍 获取经纬度</h2>
-    <div class="subhead">用于配置智能开关的地理位置</div>
+    <h2>📍 坐标获取 & 转换</h2>
+    <div class="subhead">支持 WGS-84 / GCJ-02 / BD-09，一键复制</div>
 
     <button class="btn" id="getLocationBtn">📡 获取当前位置</button>
+
+    <!-- 经纬度顺序切换 -->
+    <div class="flex-row" style="justify-content: center; margin: 8px 0;">
+        <span class="switch-label">经纬度顺序：</span>
+        <select id="orderSelect">
+            <option value="lat,lng">纬度,经度</option>
+            <option value="lng,lat" selected>经度,纬度</option>
+        </select>
+    </div>
 
     <div id="statusMsg" class="status-msg"></div>
 
     <div id="resultArea" style="display:none;">
         <div class="info-box">
-            <label>纬度 (Latitude)</label>
-            <div class="value" id="latitudeDisplay">--</div>
-            <label>经度 (Longitude)</label>
-            <div class="value" id="longitudeDisplay">--</div>
-            <label>精度</label>
-            <div class="value" style="font-size:16px; font-weight:400;" id="accuracyDisplay">--</div>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                <span style="font-weight:700; font-size:16px;">📍 坐标信息</span>
+                <span style="font-size:12px; color:#94a3b8;">精度: <span id="accuracyDisplay">--</span></span>
+            </div>
+
+            <!-- WGS-84 -->
+            <div class="coord-row">
+                <span class="label">WGS-84</span>
+                <span class="coord" id="wgs84Display">--</span>
+                <button class="btn btn-sm btn-success" data-copy="wgs84">复制</button>
+            </div>
+            <!-- GCJ-02 -->
+            <div class="coord-row">
+                <span class="label">GCJ-02</span>
+                <span class="coord" id="gcj02Display">--</span>
+                <button class="btn btn-sm btn-success" data-copy="gcj02">复制</button>
+            </div>
+            <!-- BD-09 -->
+            <div class="coord-row">
+                <span class="label">BD-09</span>
+                <span class="coord" id="bd09Display">--</span>
+                <button class="btn btn-sm btn-success" data-copy="bd09">复制</button>
+            </div>
         </div>
 
-        <button class="btn btn-success" id="copyBtn">📋 复制经纬度</button>
-        <button class="btn btn-secondary" id="copyFullBtn">📋 复制为 "纬度,经度"</button>
+        <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:8px;">
+            <button class="btn btn-secondary" id="copyAllBtn">📋 复制全部</button>
+        </div>
     </div>
 
     <div class="hint">
-        <strong>📌 使用步骤：</strong><br>
+        <strong>📌 使用说明：</strong><br>
         1. 点击 <strong>“获取当前位置”</strong> 并允许定位权限。<br>
-        2. 复制经纬度。<br>
-        3. 连接设备 AP（<strong>Apex-CFG</strong>），打开配置页面。<br>
-        4. 粘贴到对应的纬度和经度输入框。<br><br>
-        <strong>💡 提示：</strong> 若定位失败，请检查 GPS 或 WiFi 是否开启，并确保允许浏览器位置权限。
+        2. 选择经纬度顺序（纬度,经度 或 经度,纬度）。<br>
+        3. 点击对应坐标旁的 <strong>“复制”</strong> 即可。<br>
+        4. 坐标系说明：<br>
+        &nbsp;• <strong>WGS-84</strong>：GPS 原始坐标（国际标准）<br>
+        &nbsp;• <strong>GCJ-02</strong>：高德、腾讯、Google中国地图使用（火星坐标系）<br>
+        &nbsp;• <strong>BD-09</strong>：百度地图使用（火星坐标系加密偏移）<br><br>
+        <strong>💡 提示：</strong> 若定位失败，请检查 GPS 或 WiFi 是否开启，并允许浏览器位置权限。
     </div>
 </div>
 
 <script>
-    (function() {
-        const btn = document.getElementById('getLocationBtn');
-        const statusMsg = document.getElementById('statusMsg');
-        const resultArea = document.getElementById('resultArea');
-        const latDisplay = document.getElementById('latitudeDisplay');
-        const lngDisplay = document.getElementById('longitudeDisplay');
-        const accDisplay = document.getElementById('accuracyDisplay');
+(function() {
+    // ---------- 坐标系转换算法（开源，基于coordtransform） ----------
+    // WGS-84 → GCJ-02
+    function wgs84ToGcj02(lat, lng) {
+        const a = 6378245.0;
+        const ee = 0.00669342162296594323;
+        if (outOfChina(lat, lng)) return [lat, lng];
+        let dLat = transformLat(lng - 105.0, lat - 35.0);
+        let dLng = transformLng(lng - 105.0, lat - 35.0);
+        const radLat = lat / 180.0 * Math.PI;
+        let magic = Math.sin(radLat);
+        magic = 1 - ee * magic * magic;
+        const sqrtMagic = Math.sqrt(magic);
+        dLat = (dLat * 180.0) / ((a * (1 - ee)) / (magic * sqrtMagic) * Math.PI);
+        dLng = (dLng * 180.0) / (a / sqrtMagic * Math.cos(radLat) * Math.PI);
+        return [lat + dLat, lng + dLng];
+    }
 
-        function showStatus(msg, type) {
-            statusMsg.textContent = msg;
-            statusMsg.className = 'status-msg show ' + type;
+    // GCJ-02 → BD-09
+    function gcj02ToBd09(lat, lng) {
+        const x = lng;
+        const y = lat;
+        const z = Math.sqrt(x * x + y * y) + 0.00002 * Math.sin(y * 3000.0 * Math.PI / 180.0);
+        const theta = Math.atan2(y, x) + 0.000003 * Math.cos(x * 3000.0 * Math.PI / 180.0);
+        const bdLng = z * Math.cos(theta) + 0.0065;
+        const bdLat = z * Math.sin(theta) + 0.006;
+        return [bdLat, bdLng];
+    }
+
+    function outOfChina(lat, lng) {
+        if (lng < 72.004 || lng > 137.8347) return true;
+        if (lat < 0.8293 || lat > 55.8271) return true;
+        return false;
+    }
+
+    function transformLat(x, y) {
+        let ret = -100.0 + 2.0 * x + 3.0 * y + 0.2 * y * y + 0.1 * x * y + 0.2 * Math.sqrt(Math.abs(x));
+        ret += (20.0 * Math.sin(6.0 * x * Math.PI) + 20.0 * Math.sin(2.0 * x * Math.PI)) * 2.0 / 3.0;
+        ret += (20.0 * Math.sin(y * Math.PI) + 40.0 * Math.sin(y / 3.0 * Math.PI)) * 2.0 / 3.0;
+        ret += (160.0 * Math.sin(y / 12.0 * Math.PI) + 320 * Math.sin(y * Math.PI / 30.0)) * 2.0 / 3.0;
+        return ret;
+    }
+
+    function transformLng(x, y) {
+        let ret = 300.0 + x + 2.0 * y + 0.1 * x * x + 0.1 * x * y + 0.1 * Math.sqrt(Math.abs(x));
+        ret += (20.0 * Math.sin(6.0 * x * Math.PI) + 20.0 * Math.sin(2.0 * x * Math.PI)) * 2.0 / 3.0;
+        ret += (20.0 * Math.sin(x * Math.PI) + 40.0 * Math.sin(x / 3.0 * Math.PI)) * 2.0 / 3.0;
+        ret += (150.0 * Math.sin(x / 12.0 * Math.PI) + 300.0 * Math.sin(x / 30.0 * Math.PI)) * 2.0 / 3.0;
+        return ret;
+    }
+    // ---------- 转换算法结束 ----------
+
+    // DOM elements
+    const btn = document.getElementById('getLocationBtn');
+    const statusMsg = document.getElementById('statusMsg');
+    const resultArea = document.getElementById('resultArea');
+    const accDisplay = document.getElementById('accuracyDisplay');
+    const orderSelect = document.getElementById('orderSelect');
+    const wgs84Display = document.getElementById('wgs84Display');
+    const gcj02Display = document.getElementById('gcj02Display');
+    const bd09Display = document.getElementById('bd09Display');
+
+    let currentCoords = null; // { lat, lng, accuracy }
+
+    function showStatus(msg, type) {
+        statusMsg.textContent = msg;
+        statusMsg.className = 'status-msg show ' + type;
+    }
+
+    function hideStatus() {
+        statusMsg.className = 'status-msg';
+    }
+
+    function formatCoord(lat, lng) {
+        const order = orderSelect.value;
+        if (order === 'lat,lng') {
+            return lat.toFixed(6) + ', ' + lng.toFixed(6);
+        } else {
+            return lng.toFixed(6) + ', ' + lat.toFixed(6);
+        }
+    }
+
+    function updateDisplay(lat, lng, accuracy) {
+        currentCoords = { lat, lng, accuracy };
+        accDisplay.textContent = accuracy ? '±' + accuracy.toFixed(0) + ' 米' : '--';
+
+        // WGS-84
+        wgs84Display.textContent = formatCoord(lat, lng);
+
+        // GCJ-02
+        const [gcjLat, gcjLng] = wgs84ToGcj02(lat, lng);
+        gcj02Display.textContent = formatCoord(gcjLat, gcjLng);
+
+        // BD-09
+        const [bdLat, bdLng] = gcj02ToBd09(gcjLat, gcjLng);
+        bd09Display.textContent = formatCoord(bdLat, bdLng);
+
+        resultArea.style.display = 'block';
+        showStatus('✅ 定位成功！请复制需要的坐标', 'success');
+        btn.textContent = '🔄 重新定位';
+        btn.disabled = false;
+    }
+
+    function getLocation() {
+        if (!navigator.geolocation) {
+            showStatus('❌ 您的浏览器不支持定位', 'error');
+            return;
         }
 
-        function hideStatus() {
-            statusMsg.className = 'status-msg';
-        }
+        btn.disabled = true;
+        btn.textContent = '⏳ 定位中...';
+        hideStatus();
+        resultArea.style.display = 'none';
 
-        function showResult(pos) {
-            const coords = pos.coords;
-            const lat = coords.latitude.toFixed(6);
-            const lng = coords.longitude.toFixed(6);
-            latDisplay.textContent = lat;
-            lngDisplay.textContent = lng;
-            accDisplay.textContent = coords.accuracy ? '±' + coords.accuracy.toFixed(0) + ' 米' : '--';
-            resultArea.style.display = 'block';
-            showStatus('✅ 定位成功！请复制经纬度', 'success');
-            btn.textContent = '🔄 重新定位';
-            btn.disabled = false;
-        }
+        navigator.geolocation.getCurrentPosition(
+            function(pos) {
+                const coords = pos.coords;
+                updateDisplay(coords.latitude, coords.longitude, coords.accuracy);
+            },
+            function(err) {
+                btn.disabled = false;
+                btn.textContent = '📍 重新获取';
+                let msg = '定位失败：';
+                switch(err.code) {
+                    case err.PERMISSION_DENIED: msg += '用户拒绝权限，请在浏览器设置中允许'; break;
+                    case err.POSITION_UNAVAILABLE: msg += '位置不可用（GPS/WiFi未开）'; break;
+                    case err.TIMEOUT: msg += '定位超时，请重试'; break;
+                    default: msg += err.message;
+                }
+                showStatus('❌ ' + msg, 'error');
+            },
+            { enableHighAccuracy: true, timeout: 15000 }
+        );
+    }
 
-        function getLocation() {
-            if (!navigator.geolocation) {
-                showStatus('❌ 您的浏览器不支持定位', 'error');
-                return;
-            }
-
-            btn.disabled = true;
-            btn.textContent = '⏳ 定位中...';
-            hideStatus();
-            resultArea.style.display = 'none';
-
-            navigator.geolocation.getCurrentPosition(
-                function(pos) {
-                    showResult(pos);
-                },
-                function(err) {
-                    btn.disabled = false;
-                    btn.textContent = '📍 重新获取';
-                    let msg = '定位失败：';
-                    switch(err.code) {
-                        case err.PERMISSION_DENIED: msg += '用户拒绝权限，请在浏览器设置中允许'; break;
-                        case err.POSITION_UNAVAILABLE: msg += '位置不可用（GPS/WiFi未开）'; break;
-                        case err.TIMEOUT: msg += '定位超时，请重试'; break;
-                        default: msg += err.message;
-                    }
-                    showStatus('❌ ' + msg, 'error');
-                },
-                { enableHighAccuracy: true, timeout: 15000 }
-            );
-        }
-
-        // 复制函数
-        function copyText(text, successMsg) {
-            if (navigator.clipboard && navigator.clipboard.writeText) {
-                navigator.clipboard.writeText(text).then(() => {
-                    showStatus('✅ ' + successMsg, 'success');
-                }).catch(() => {
-                    fallbackCopy(text, successMsg);
-                });
-            } else {
-                fallbackCopy(text, successMsg);
-            }
-        }
-
-        function fallbackCopy(text, successMsg) {
-            const textarea = document.createElement('textarea');
-            textarea.value = text;
-            textarea.style.position = 'fixed';
-            textarea.style.left = '-9999px';
-            document.body.appendChild(textarea);
-            textarea.select();
-            try {
-                document.execCommand('copy');
+    // 复制功能
+    function copyText(text, successMsg) {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text).then(() => {
                 showStatus('✅ ' + successMsg, 'success');
-            } catch (e) {
-                showStatus('❌ 复制失败，请手动复制', 'error');
-            }
-            document.body.removeChild(textarea);
+            }).catch(() => {
+                fallbackCopy(text, successMsg);
+            });
+        } else {
+            fallbackCopy(text, successMsg);
         }
+    }
 
-        document.getElementById('copyBtn').addEventListener('click', function() {
-            const lat = latDisplay.textContent;
-            const lng = lngDisplay.textContent;
-            if (lat === '--' || lng === '--') {
+    function fallbackCopy(text, successMsg) {
+        const textarea = document.createElement('textarea');
+        textarea.value = text;
+        textarea.style.position = 'fixed';
+        textarea.style.left = '-9999px';
+        document.body.appendChild(textarea);
+        textarea.select();
+        try {
+            document.execCommand('copy');
+            showStatus('✅ ' + successMsg, 'success');
+        } catch (e) {
+            showStatus('❌ 复制失败，请手动复制', 'error');
+        }
+        document.body.removeChild(textarea);
+    }
+
+    // 复制按钮事件（使用 data-copy 属性）
+    document.querySelectorAll('[data-copy]').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const type = this.getAttribute('data-copy');
+            let coordText = '';
+            let coordName = '';
+            if (type === 'wgs84') {
+                coordText = wgs84Display.textContent;
+                coordName = 'WGS-84';
+            } else if (type === 'gcj02') {
+                coordText = gcj02Display.textContent;
+                coordName = 'GCJ-02';
+            } else if (type === 'bd09') {
+                coordText = bd09Display.textContent;
+                coordName = 'BD-09';
+            }
+            if (!coordText || coordText === '--') {
                 showStatus('请先获取位置', 'error');
                 return;
             }
-            copyText(lat + ', ' + lng, '已复制：' + lat + ', ' + lng);
+            copyText(coordText, coordName + ' 坐标已复制：' + coordText);
         });
+    });
 
-        document.getElementById('copyFullBtn').addEventListener('click', function() {
-            const lat = latDisplay.textContent;
-            const lng = lngDisplay.textContent;
-            if (lat === '--' || lng === '--') {
-                showStatus('请先获取位置', 'error');
-                return;
-            }
-            copyText(lat + ',' + lng, '已复制：' + lat + ',' + lng);
-        });
+    // 复制全部
+    document.getElementById('copyAllBtn').addEventListener('click', function() {
+        if (!currentCoords) {
+            showStatus('请先获取位置', 'error');
+            return;
+        }
+        const order = orderSelect.value;
+        const lat = currentCoords.lat;
+        const lng = currentCoords.lng;
+        const [gcjLat, gcjLng] = wgs84ToGcj02(lat, lng);
+        const [bdLat, bdLng] = gcj02ToBd09(gcjLat, gcjLng);
+        let text = '';
+        if (order === 'lat,lng') {
+            text = `WGS-84: ${lat.toFixed(6)},${lng.toFixed(6)}\nGCJ-02: ${gcjLat.toFixed(6)},${gcjLng.toFixed(6)}\nBD-09: ${bdLat.toFixed(6)},${bdLng.toFixed(6)}`;
+        } else {
+            text = `WGS-84: ${lng.toFixed(6)},${lat.toFixed(6)}\nGCJ-02: ${gcjLng.toFixed(6)},${gcjLat.toFixed(6)}\nBD-09: ${bdLng.toFixed(6)},${bdLat.toFixed(6)}`;
+        }
+        copyText(text, '全部坐标已复制');
+    });
 
-        btn.addEventListener('click', getLocation);
-    })();
+    // 顺序切换时更新显示
+    orderSelect.addEventListener('change', function() {
+        if (currentCoords) {
+            updateDisplay(currentCoords.lat, currentCoords.lng, currentCoords.accuracy);
+        }
+    });
+
+    btn.addEventListener('click', getLocation);
+})();
 </script>
 </body>
 </html>
