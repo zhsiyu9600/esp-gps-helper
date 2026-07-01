@@ -14,6 +14,8 @@
             display: flex;
             justify-content: center;
             align-items: center;
+            -webkit-text-size-adjust: 100% !important;
+            text-size-adjust: 100% !important;
         }
         .card {
             max-width: 520px;
@@ -59,12 +61,6 @@
             margin-top: 8px;
         }
         .info-box label:first-child { margin-top: 0; }
-        .info-box .value {
-            font-size: 18px;
-            font-weight: 700;
-            color: #1e293b;
-            word-break: break-all;
-        }
         .coord-row {
             display: flex;
             justify-content: space-between;
@@ -72,8 +68,24 @@
             padding: 4px 0;
             border-bottom: 1px solid #eef2f6;
         }
-        .coord-row .label { font-weight: 600; color: #475569; min-width: 60px; }
-        .coord-row .coord { font-family: monospace; font-size: 14px; color: #0f172a; }
+        .coord-row .label { font-weight: 600; color: #475569; min-width: 60px; font-size: 16px; }
+        .coord-row .coord {
+            font-family: monospace;
+            font-size: 15px !important;
+            font-weight: 400;
+            color: #0f172a;
+            word-break: break-all;
+        }
+        .value {
+            font-size: 16px !important;
+            font-weight: 700;
+            color: #1e293b;
+            word-break: break-all;
+        }
+        #accuracyDisplay {
+            font-size: 14px !important;
+            font-weight: 400;
+        }
         .status-msg {
             padding: 12px 16px;
             border-radius: 12px;
@@ -117,7 +129,6 @@
 
     <button class="btn" id="getLocationBtn">📡 获取当前位置</button>
 
-    <!-- 经纬度顺序切换 -->
     <div class="flex-row" style="justify-content: center; margin: 8px 0;">
         <span class="switch-label">经纬度顺序：</span>
         <select id="orderSelect">
@@ -135,19 +146,16 @@
                 <span style="font-size:12px; color:#94a3b8;">精度: <span id="accuracyDisplay">--</span></span>
             </div>
 
-            <!-- WGS-84 -->
             <div class="coord-row">
                 <span class="label">WGS-84</span>
                 <span class="coord" id="wgs84Display">--</span>
                 <button class="btn btn-sm btn-success" data-copy="wgs84">复制</button>
             </div>
-            <!-- GCJ-02 -->
             <div class="coord-row">
                 <span class="label">GCJ-02</span>
                 <span class="coord" id="gcj02Display">--</span>
                 <button class="btn btn-sm btn-success" data-copy="gcj02">复制</button>
             </div>
-            <!-- BD-09 -->
             <div class="coord-row">
                 <span class="label">BD-09</span>
                 <span class="coord" id="bd09Display">--</span>
@@ -175,8 +183,7 @@
 
 <script>
 (function() {
-    // ---------- 坐标系转换算法（开源，基于coordtransform） ----------
-    // WGS-84 → GCJ-02
+    // ---------- 坐标系转换算法 ----------
     function wgs84ToGcj02(lat, lng) {
         const a = 6378245.0;
         const ee = 0.00669342162296594323;
@@ -192,7 +199,6 @@
         return [lat + dLat, lng + dLng];
     }
 
-    // GCJ-02 → BD-09
     function gcj02ToBd09(lat, lng) {
         const x = lng;
         const y = lat;
@@ -224,9 +230,8 @@
         ret += (150.0 * Math.sin(x / 12.0 * Math.PI) + 300.0 * Math.sin(x / 30.0 * Math.PI)) * 2.0 / 3.0;
         return ret;
     }
-    // ---------- 转换算法结束 ----------
 
-    // DOM elements
+    // ---------- DOM ----------
     const btn = document.getElementById('getLocationBtn');
     const statusMsg = document.getElementById('statusMsg');
     const resultArea = document.getElementById('resultArea');
@@ -236,7 +241,7 @@
     const gcj02Display = document.getElementById('gcj02Display');
     const bd09Display = document.getElementById('bd09Display');
 
-    let currentCoords = null; // { lat, lng, accuracy }
+    let currentCoords = null;
 
     function showStatus(msg, type) {
         statusMsg.textContent = msg;
@@ -260,14 +265,9 @@
         currentCoords = { lat, lng, accuracy };
         accDisplay.textContent = accuracy ? '±' + accuracy.toFixed(0) + ' 米' : '--';
 
-        // WGS-84
         wgs84Display.textContent = formatCoord(lat, lng);
-
-        // GCJ-02
         const [gcjLat, gcjLng] = wgs84ToGcj02(lat, lng);
         gcj02Display.textContent = formatCoord(gcjLat, gcjLng);
-
-        // BD-09
         const [bdLat, bdLng] = gcj02ToBd09(gcjLat, gcjLng);
         bd09Display.textContent = formatCoord(bdLat, bdLng);
 
@@ -282,7 +282,6 @@
             showStatus('❌ 您的浏览器不支持定位', 'error');
             return;
         }
-
         btn.disabled = true;
         btn.textContent = '⏳ 定位中...';
         hideStatus();
@@ -309,14 +308,11 @@
         );
     }
 
-    // 复制功能
     function copyText(text, successMsg) {
         if (navigator.clipboard && navigator.clipboard.writeText) {
             navigator.clipboard.writeText(text).then(() => {
                 showStatus('✅ ' + successMsg, 'success');
-            }).catch(() => {
-                fallbackCopy(text, successMsg);
-            });
+            }).catch(() => fallbackCopy(text, successMsg));
         } else {
             fallbackCopy(text, successMsg);
         }
@@ -338,12 +334,10 @@
         document.body.removeChild(textarea);
     }
 
-    // 复制按钮事件（使用 data-copy 属性）
     document.querySelectorAll('[data-copy]').forEach(btn => {
         btn.addEventListener('click', function() {
             const type = this.getAttribute('data-copy');
-            let coordText = '';
-            let coordName = '';
+            let coordText = '', coordName = '';
             if (type === 'wgs84') {
                 coordText = wgs84Display.textContent;
                 coordName = 'WGS-84';
@@ -362,7 +356,6 @@
         });
     });
 
-    // 复制全部
     document.getElementById('copyAllBtn').addEventListener('click', function() {
         if (!currentCoords) {
             showStatus('请先获取位置', 'error');
@@ -382,7 +375,6 @@
         copyText(text, '全部坐标已复制');
     });
 
-    // 顺序切换时更新显示
     orderSelect.addEventListener('change', function() {
         if (currentCoords) {
             updateDisplay(currentCoords.lat, currentCoords.lng, currentCoords.accuracy);
