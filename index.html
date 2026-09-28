@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>获取坐标（含坐标系转换）</title>
+    <title>获取坐标（含坐标系转换 & 距离方向）</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
@@ -67,6 +67,7 @@
             align-items: center;
             padding: 4px 0;
             border-bottom: 1px solid #eef2f6;
+            gap: 8px;
         }
         .coord-row .label { font-weight: 600; color: #475569; min-width: 60px; font-size: 16px; }
         .coord-row .coord {
@@ -75,6 +76,8 @@
             font-weight: 400;
             color: #0f172a;
             word-break: break-all;
+            flex: 1;
+            text-align: right;
         }
         .value {
             font-size: 16px !important;
@@ -120,12 +123,80 @@
             background: #fef3c7;
             color: #92400e;
         }
+
+        /* ===== 新增：目标坐标输入 & 计算结果 ===== */
+        .input-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+        .input-grid input {
+            width: 100%;
+            padding: 11px 12px;
+            border-radius: 12px;
+            border: 1px solid #cbd5e1;
+            font-size: 15px;
+            font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+            background: #fff;
+            color: #0f172a;
+        }
+        .input-grid input:focus {
+            outline: none;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59,130,246,0.15);
+        }
+        .input-grid input::placeholder { color: #94a3b8; font-family: inherit; font-size: 14px; }
+        .hint-sm { font-size: 12px; color: #94a3b8; margin-top: 8px; line-height: 1.5; }
+
+        .calc-card {
+            margin-top: 14px;
+            padding: 16px;
+            background: #fff;
+            border: 1px solid #e2e8f0;
+            border-radius: 16px;
+        }
+        .compass { display: block; width: 128px; height: 128px; margin: 0 auto 4px; }
+        .result-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 12px;
+        }
+        .result-item {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 10px 12px;
+        }
+        .ri-label { font-size: 12px; color: #64748b; margin-bottom: 3px; }
+        .ri-value {
+            font-size: 16px;
+            font-weight: 700;
+            color: #0f172a;
+            font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+            word-break: break-all;
+            line-height: 1.35;
+        }
+        .ri-value.small { font-size: 13px; font-weight: 600; }
+        .summary {
+            text-align: center;
+            font-size: 14px;
+            color: #334155;
+            background: #eff6ff;
+            border: 1px solid #bfdbfe;
+            border-radius: 12px;
+            padding: 10px 12px;
+            margin-top: 12px;
+            line-height: 1.7;
+        }
+        .summary b { color: #1d4ed8; }
+        .full { grid-column: 1 / -1; }
     </style>
 </head>
 <body>
 <div class="card">
     <h2>📍 坐标获取 & 转换</h2>
-    <div class="subhead">支持 WGS-84 / GCJ-02 / BD-09，一键复制</div>
+    <div class="subhead">支持 WGS-84 / GCJ-02 / BD-09，一键复制，并可计算与目标点的距离方向</div>
 
     <button class="btn" id="getLocationBtn">📡 获取当前位置</button>
 
@@ -142,7 +213,7 @@
     <div id="resultArea" style="display:none;">
         <div class="info-box">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-                <span style="font-weight:700; font-size:16px;">📍 坐标信息</span>
+                <span style="font-weight:700; font-size:16px;">📍 当前位置坐标</span>
                 <span style="font-size:12px; color:#94a3b8;">精度: <span id="accuracyDisplay">--</span></span>
             </div>
 
@@ -168,16 +239,87 @@
         </div>
     </div>
 
+    <!-- ===== 目标坐标输入 & 距离方向计算 ===== -->
+    <div class="info-box">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+            <span style="font-weight:700; font-size:16px;">🎯 目标坐标</span>
+            <select id="targetCrs" style="font-size:12px; padding:4px 8px;">
+                <option value="wgs84" selected>WGS-84</option>
+                <option value="gcj02">GCJ-02</option>
+                <option value="bd09">BD-09</option>
+            </select>
+        </div>
+
+        <div class="input-grid">
+            <input type="text" id="targetLat" inputmode="decimal" autocomplete="off" placeholder="纬度 39.908722">
+            <input type="text" id="targetLng" inputmode="decimal" autocomplete="off" placeholder="经度 116.397499">
+        </div>
+
+        <div class="flex-row" style="margin-top:10px;">
+            <button class="btn btn-secondary btn-sm" id="calcBtn" style="flex:1; margin:0; padding:12px;">📐 计算距离与方向</button>
+        </div>
+
+        <div class="hint-sm">提示：可直接粘贴 “39.9087,116.3975” 自动拆分填入（若第一个数 &gt; 90 会自动识别为经度）</div>
+
+        <div class="calc-card" id="targetResult" style="display:none;">
+            <svg class="compass" viewBox="-60 -60 120 120" aria-hidden="true">
+                <circle r="54" fill="#fff" stroke="#e2e8f0" stroke-width="2"/>
+                <circle r="44" fill="none" stroke="#f1f5f9" stroke-width="1"/>
+                <text x="0" y="-38" text-anchor="middle" font-size="11" font-weight="700" fill="#94a3b8">N</text>
+                <text x="0" y="46" text-anchor="middle" font-size="11" font-weight="700" fill="#cbd5e1">S</text>
+                <text x="41" y="4" text-anchor="middle" font-size="11" font-weight="700" fill="#cbd5e1">E</text>
+                <text x="-41" y="4" text-anchor="middle" font-size="11" font-weight="700" fill="#cbd5e1">W</text>
+                <g id="needleGroup">
+                    <polygon points="0,-34 -8,2 0,-4 8,2" fill="#3b82f6"/>
+                    <polygon points="0,34 -8,-2 0,4 8,-2" fill="#e2e8f0"/>
+                </g>
+                <circle r="3.5" fill="#1e293b"/>
+            </svg>
+
+            <div class="result-grid">
+                <div class="result-item">
+                    <div class="ri-label">直线距离</div>
+                    <div class="ri-value" id="distDisplay">--</div>
+                </div>
+                <div class="result-item">
+                    <div class="ri-label">方位角（正北为 0°）</div>
+                    <div class="ri-value" id="bearingDisplay">--</div>
+                </div>
+                <div class="result-item">
+                    <div class="ri-label">目标方向</div>
+                    <div class="ri-value" id="dirDisplay">--</div>
+                </div>
+                <div class="result-item">
+                    <div class="ri-label">反向（目标→你）</div>
+                    <div class="ri-value" id="backDirDisplay">--</div>
+                </div>
+                <div class="result-item full">
+                    <div class="ri-label">纬度差 / 经度差（目标 − 当前）</div>
+                    <div class="ri-value small" id="deltaDisplay">--</div>
+                </div>
+                <div class="result-item full" id="targetWgsRow" style="display:none;">
+                    <div class="ri-label">目标点 WGS-84 坐标</div>
+                    <div class="ri-value small" id="targetWgsDisplay">--</div>
+                </div>
+            </div>
+
+            <div class="summary" id="summaryText">--</div>
+
+            <button class="btn btn-sm btn-secondary" id="copyResultBtn" style="width:100%; margin:10px 0 0; padding:11px;">📋 复制计算结果</button>
+        </div>
+    </div>
+
     <div class="hint">
         <strong>📌 使用说明：</strong><br>
         1. 点击 <strong>“获取当前位置”</strong> 并允许定位权限。<br>
         2. 选择经纬度顺序（纬度,经度 或 经度,纬度）。<br>
         3. 点击对应坐标旁的 <strong>“复制”</strong> 即可。<br>
-        4. 坐标系说明：<br>
+        4. <strong>目标坐标</strong>：选择坐标系后输入目标经纬度，点击「计算距离与方向」，即可看到直线距离、方位角、方向（含指南针示意）。<br>
+        5. 坐标系说明：<br>
         &nbsp;• <strong>WGS-84</strong>：GPS 原始坐标（国际标准）<br>
         &nbsp;• <strong>GCJ-02</strong>：高德、腾讯、Google中国地图使用（火星坐标系）<br>
         &nbsp;• <strong>BD-09</strong>：百度地图使用（火星坐标系加密偏移）<br><br>
-        <strong>💡 提示：</strong> 若定位失败，请检查 GPS 或 WiFi 是否开启，并允许浏览器位置权限。
+        <strong>💡 提示：</strong> 距离采用 Haversine 球面公式计算（地球平均半径 6371008.8 米）；方位角以真北为 0°、顺时针增加，不涉及磁偏角；指南针示意为“地图北朝上”，与手机朝向无关。若定位失败，请检查 GPS 或 WiFi 是否开启，并允许浏览器位置权限。
     </div>
 </div>
 
@@ -209,6 +351,26 @@
         return [bdLat, bdLng];
     }
 
+    // 反向：GCJ-02 -> WGS-84（迭代逼近，精度可达厘米级）
+    function gcj02ToWgs84(lat, lng) {
+        let wLat = lat, wLng = lng;
+        for (let i = 0; i < 6; i++) {
+            const [gLat, gLng] = wgs84ToGcj02(wLat, wLng);
+            wLat += lat - gLat;
+            wLng += lng - gLng;
+        }
+        return [wLat, wLng];
+    }
+
+    // 反向：BD-09 -> GCJ-02
+    function bd09ToGcj02(lat, lng) {
+        const x = lng - 0.0065;
+        const y = lat - 0.006;
+        const z = Math.sqrt(x * x + y * y) - 0.00002 * Math.sin(y * 3000.0 * Math.PI / 180.0);
+        const theta = Math.atan2(y, x) - 0.000003 * Math.cos(x * 3000.0 * Math.PI / 180.0);
+        return [z * Math.sin(theta), z * Math.cos(theta)];
+    }
+
     function outOfChina(lat, lng) {
         if (lng < 72.004 || lng > 137.8347) return true;
         if (lat < 0.8293 || lat > 55.8271) return true;
@@ -231,6 +393,43 @@
         return ret;
     }
 
+    // ---------- 距离 & 方位计算 ----------
+    const EARTH_R = 6371008.8;
+
+    function toRad(d) { return d * Math.PI / 180; }
+    function toDeg(r) { return r * 180 / Math.PI; }
+
+    // Haversine 球面距离（米）
+    function distanceMeters(lat1, lng1, lat2, lng2) {
+        const p1 = toRad(lat1), p2 = toRad(lat2);
+        const dp = toRad(lat2 - lat1), dl = toRad(lng2 - lng1);
+        const a = Math.sin(dp / 2) * Math.sin(dp / 2) +
+                  Math.cos(p1) * Math.cos(p2) * Math.sin(dl / 2) * Math.sin(dl / 2);
+        return 2 * EARTH_R * Math.asin(Math.min(1, Math.sqrt(a)));
+    }
+
+    // 初始方位角（0~360，正北为 0，顺时针）
+    function bearingDeg(lat1, lng1, lat2, lng2) {
+        const p1 = toRad(lat1), p2 = toRad(lat2), dl = toRad(lng2 - lng1);
+        const y = Math.sin(dl) * Math.cos(p2);
+        const x = Math.cos(p1) * Math.sin(p2) - Math.sin(p1) * Math.cos(p2) * Math.cos(dl);
+        return (toDeg(Math.atan2(y, x)) + 360) % 360;
+    }
+
+    const DIR_NAMES = ['北', '东北偏北', '东北', '东北偏东', '东', '东南偏东', '东南', '东南偏南',
+                       '南', '西南偏南', '西南', '西南偏西', '西', '西北偏西', '西北', '西北偏北'];
+
+    function dirName(b) {
+        return DIR_NAMES[Math.round(b / 22.5) % 16];
+    }
+
+    function formatDistance(m) {
+        if (m < 1) return m.toFixed(2) + ' 米';
+        if (m < 1000) return m.toFixed(1) + ' 米';
+        if (m < 10000) return (m / 1000).toFixed(3) + ' 公里';
+        return (m / 1000).toFixed(2) + ' 公里';
+    }
+
     // ---------- DOM ----------
     const btn = document.getElementById('getLocationBtn');
     const statusMsg = document.getElementById('statusMsg');
@@ -241,7 +440,25 @@
     const gcj02Display = document.getElementById('gcj02Display');
     const bd09Display = document.getElementById('bd09Display');
 
+    // 目标坐标相关 DOM
+    const targetCrs = document.getElementById('targetCrs');
+    const targetLatEl = document.getElementById('targetLat');
+    const targetLngEl = document.getElementById('targetLng');
+    const calcBtn = document.getElementById('calcBtn');
+    const targetResult = document.getElementById('targetResult');
+    const needleGroup = document.getElementById('needleGroup');
+    const distDisplay = document.getElementById('distDisplay');
+    const bearingDisplay = document.getElementById('bearingDisplay');
+    const dirDisplay = document.getElementById('dirDisplay');
+    const backDirDisplay = document.getElementById('backDirDisplay');
+    const deltaDisplay = document.getElementById('deltaDisplay');
+    const targetWgsRow = document.getElementById('targetWgsRow');
+    const targetWgsDisplay = document.getElementById('targetWgsDisplay');
+    const summaryText = document.getElementById('summaryText');
+
     let currentCoords = null;
+    let hasCalc = false;       // 是否已经计算过目标信息
+    let lastResultText = '';   // 用于复制
 
     function showStatus(msg, type) {
         statusMsg.textContent = msg;
@@ -275,6 +492,9 @@
         showStatus('✅ 定位成功！请复制需要的坐标', 'success');
         btn.textContent = '🔄 重新定位';
         btn.disabled = false;
+
+        // 若此前已计算过目标信息，位置更新后自动重算
+        if (hasCalc) calcTarget(true);
     }
 
     function getLocation() {
@@ -334,8 +554,99 @@
         document.body.removeChild(textarea);
     }
 
-    document.querySelectorAll('[data-copy]').forEach(btn => {
-        btn.addEventListener('click', function() {
+    // ---------- 目标点计算 ----------
+    function targetToWgs84(lat, lng, crs) {
+        if (crs === 'gcj02') {
+            return gcj02ToWgs84(lat, lng);
+        }
+        if (crs === 'bd09') {
+            const [gLat, gLng] = bd09ToGcj02(lat, lng);
+            return gcj02ToWgs84(gLat, gLng);
+        }
+        return [lat, lng];
+    }
+
+    function calcTarget(silent) {
+        if (!currentCoords) {
+            targetResult.style.display = 'none';
+            if (!silent) showStatus('❌ 请先点击上方按钮获取当前位置', 'error');
+            return;
+        }
+
+        const rawLat = targetLatEl.value.trim();
+        const rawLng = targetLngEl.value.trim();
+        const tLat = parseFloat(rawLat);
+        const tLng = parseFloat(rawLng);
+
+        if (rawLat === '' || rawLng === '' || !isFinite(tLat) || !isFinite(tLng) ||
+            Math.abs(tLat) > 90 || Math.abs(tLng) > 180) {
+            targetResult.style.display = 'none';
+            hasCalc = false;
+            if (!silent) showStatus('❌ 请输入有效的目标经纬度（纬度 -90~90，经度 -180~180）', 'error');
+            return;
+        }
+
+        const crs = targetCrs.value;
+        const [wLat, wLng] = targetToWgs84(tLat, tLng, crs);
+        const cLat = currentCoords.lat;
+        const cLng = currentCoords.lng;
+
+        const dist = distanceMeters(cLat, cLng, wLat, wLng);
+        const brg = bearingDeg(cLat, cLng, wLat, wLng);
+        const backBrg = (brg + 180) % 360;
+
+        hasCalc = true;
+        targetResult.style.display = 'block';
+
+        // 距离
+        distDisplay.textContent = formatDistance(dist);
+
+        if (dist < 1) {
+            bearingDisplay.textContent = '—';
+            dirDisplay.textContent = '位置重合';
+            backDirDisplay.textContent = '—';
+            needleGroup.setAttribute('transform', 'rotate(0)');
+            summaryText.innerHTML = '当前点与目标点几乎重合（距离小于 1 米）';
+        } else {
+            bearingDisplay.textContent = brg.toFixed(1) + '°';
+            dirDisplay.textContent = dirName(brg);
+            backDirDisplay.textContent = dirName(backBrg) + '（' + backBrg.toFixed(1) + '°）';
+            needleGroup.setAttribute('transform', 'rotate(' + brg.toFixed(1) + ')');
+            summaryText.innerHTML =
+                '目标位于你的 <b>' + dirName(brg) + '</b> 方向，' +
+                '方位角 <b>' + brg.toFixed(1) + '°</b>，' +
+                '直线距离约 <b>' + formatDistance(dist) + '</b>';
+        }
+
+        // 差值
+        const dLat = wLat - cLat;
+        const dLng = wLng - cLng;
+        deltaDisplay.textContent = 'Δ纬 ' + dLat.toFixed(6) + '  /  Δ经 ' + dLng.toFixed(6);
+
+        // 目标点 WGS-84 坐标（输入非 WGS-84 时展示）
+        if (crs !== 'wgs84') {
+            targetWgsRow.style.display = '';
+            const label = crs === 'gcj02' ? 'GCJ-02' : 'BD-09';
+            targetWgsDisplay.textContent = formatCoord(wLat, wLng) + '（由 ' + label + ' 转换）';
+        } else {
+            targetWgsRow.style.display = 'none';
+        }
+
+        // 复制用文本
+        lastResultText =
+            '当前位置(WGS-84)：' + cLat.toFixed(6) + ', ' + cLng.toFixed(6) + '\n' +
+            '目标位置(WGS-84)：' + wLat.toFixed(6) + ', ' + wLng.toFixed(6) + '\n' +
+            '直线距离：' + formatDistance(dist) + '\n' +
+            '方位角：' + (dist < 1 ? '—' : brg.toFixed(1) + '°') + '\n' +
+            '方向：' + (dist < 1 ? '位置重合' : dirName(brg)) + '\n' +
+            '纬度差/经度差：' + dLat.toFixed(6) + ' / ' + dLng.toFixed(6);
+
+        if (!silent) showStatus('✅ 已计算目标点的距离与方向', 'success');
+    }
+
+    // ---------- 事件绑定 ----------
+    document.querySelectorAll('[data-copy]').forEach(b => {
+        b.addEventListener('click', function() {
             const type = this.getAttribute('data-copy');
             let coordText = '', coordName = '';
             if (type === 'wgs84') {
@@ -379,6 +690,69 @@
         if (currentCoords) {
             updateDisplay(currentCoords.lat, currentCoords.lng, currentCoords.accuracy);
         }
+    });
+
+    // 计算按钮
+    calcBtn.addEventListener('click', function() { calcTarget(false); });
+
+    // 输入框回车
+    [targetLatEl, targetLngEl].forEach(el => {
+        el.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                calcTarget(false);
+            }
+        });
+    });
+
+    // 输入变化时（若已算过）自动重算
+    let calcTimer = null;
+    function scheduleCalc() {
+        clearTimeout(calcTimer);
+        calcTimer = setTimeout(function() {
+            if (hasCalc) calcTarget(true);
+        }, 350);
+    }
+    targetLatEl.addEventListener('input', scheduleCalc);
+    targetLngEl.addEventListener('input', scheduleCalc);
+
+    // 切换目标坐标系后自动重算
+    targetCrs.addEventListener('change', function() {
+        if (hasCalc) calcTarget(true);
+    });
+
+    // 智能粘贴：支持 "39.9087,116.3975" / "39.9087 116.3975"
+    function handleSmartPaste(e) {
+        const text = (e.clipboardData || window.clipboardData).getData('text');
+        if (!text) return;
+        const nums = text.match(/-?\d+(?:\.\d+)?/g);
+        if (nums && nums.length >= 2) {
+            e.preventDefault();
+            let a = parseFloat(nums[0]);
+            let b = parseFloat(nums[1]);
+            let lat, lng;
+            // 若第一个数绝对值 > 90，则它不可能是纬度 → 判定为“经度,纬度”
+            if (Math.abs(a) > 90 && Math.abs(b) <= 90) {
+                lng = a; lat = b;
+            } else {
+                lat = a; lng = b;
+            }
+            targetLatEl.value = lat;
+            targetLngEl.value = lng;
+            if (hasCalc) calcTarget(true);
+            showStatus('✅ 已解析坐标：纬度 ' + lat + '，经度 ' + lng + '（若顺序不对请手动调整）', 'info');
+        }
+    }
+    targetLatEl.addEventListener('paste', handleSmartPaste);
+    targetLngEl.addEventListener('paste', handleSmartPaste);
+
+    // 复制计算结果
+    document.getElementById('copyResultBtn').addEventListener('click', function() {
+        if (!lastResultText) {
+            showStatus('请先计算距离与方向', 'error');
+            return;
+        }
+        copyText(lastResultText, '计算结果已复制');
     });
 
     btn.addEventListener('click', getLocation);
